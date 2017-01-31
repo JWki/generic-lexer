@@ -1,0 +1,16 @@
+#include "somefile.h"
+@import some_module
+
+/*
+    This is a multiline comment
+    /*
+        With nesting
+    */
+*/
+
+// this is a singleline comment
+
+int main(int argc, char* argv[]) 
+{
+    return 0;
+}
