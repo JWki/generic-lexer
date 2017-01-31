@@ -99,10 +99,11 @@ namespace generic_lexer
         CHARACTER_CONSTANT = 38,
         NUMERIC_CONSTANT = 39,
 
-        DOUBLE_COLON = 40
+        DOUBLE_COLON = 40,
+        EoF = 41
 	};
 
-	static const char* TokenStrings[41] = {
+	static const char* TokenStrings[42] = {
 		"UNDEFINED", "GENERIC_TOKEN", 
 		"PARENTHESES_OPEN", "PARENTHESES_CLOSE",
 		"SQUARE_BRACKET_OPEN", "SQUARE_BRACKET_CLOSE",
@@ -112,7 +113,7 @@ namespace generic_lexer
 		"LESS", "LEQUALS", "GREATER", "GEQUALS", "NOT_EQUALS", "AMPERSAND",
 		"DOUBLE_AMPERSAND", "PIPE", "DOUBLE_PIPE", "CARET", "DOUBLE_CARET", "TILDE",
 		"AT", "POUND", "QUOTATION_MARK", "APOSTROPHE", "STRING_LITERAL", "CHARACTER_CONSTANT", "NUMERIC_CONSTANT",
-        "DOUBLE_COLON"
+        "DOUBLE_COLON", "EoF"
 	}; 
 
 	struct Token
@@ -121,6 +122,8 @@ namespace generic_lexer
 		char*       text = nullptr;     // pointer into the source buffer
 		uint32_t    length = 0;         // length of the string containing the token
         uint16_t    userType = 0;       // can be used to add token types in additional passes
+
+        uint32_t    lineNumber = 0;
 	};
 
 	//
@@ -135,6 +138,7 @@ namespace generic_lexer
 		uint32_t 	_numTokens = 0;
 
 		char*       _currentPos = nullptr;  // pointer to the current parse position
+        uint32_t    _lineNumber = 0;
 
 		uint16_t    _multilineCommentDepth = 0; // we support nested multiline comments. suck it, C.
 
@@ -187,6 +191,9 @@ namespace generic_lexer
 	void EatWhitespaces(Lexer* context)
 	{
 		while (!IsEoF(context->GetChar()) && IsWhitespace(context->GetChar())) {
+            if (IsEndl(context->GetChar())) {
+                context->_lineNumber++;
+            }
 			context->AdvanceOne();
 		}
 	}
@@ -209,6 +216,9 @@ namespace generic_lexer
 				context->AdvanceOne();
 				continue;
 			}
+            if (IsEndl(c)) {
+                context->_lineNumber++;
+            }
 			context->AdvanceOne();
 		} while (context->_multilineCommentDepth > 0);
 	}
@@ -218,12 +228,14 @@ namespace generic_lexer
 		while(!IsEndl(context->GetChar())) {
 			context->AdvanceOne(); 
 		}
+        context->_lineNumber++;
 	}
 	
 	void WriteToken(Token token, Lexer* context)
 	{
 		auto newTokenOffset = context->_tokenStreamBufferOffset + 1;
 		assert(sizeof(Token) * newTokenOffset <= context->_tokenStreamBufferSize);
+        token.lineNumber = context->_lineNumber;
 		memcpy(&context->_tokenStreamBuffer[context->_tokenStreamBufferOffset], &token, sizeof(Token));
 		context->_tokenStreamBufferOffset = newTokenOffset;
 		context->_numTokens++;
@@ -685,6 +697,7 @@ namespace generic_lexer
 		context->_currentPos = context->_bufferStart;
 		context->_flags = flags;
 		context->_numTokens = 0;
+        context->_lineNumber = 1;   // gross. but correct.
 
 		while (!IsEoF(context->GetChar())) {
 			EatWhitespaces(context);
@@ -693,6 +706,12 @@ namespace generic_lexer
                 return false;
             }
 		}
+        Token eofToken;
+        eofToken.text = context->_currentPos;
+        eofToken.length = 1;
+        eofToken.type = TokenType::EoF;
+        eofToken.userType = 0;
+        WriteToken(eofToken, context);
 
 		return true;
 	}
