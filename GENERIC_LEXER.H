@@ -228,6 +228,7 @@ namespace generic_lexer
 		while(!IsEndl(context->GetChar())) {
 			context->AdvanceOne(); 
 		}
+		context->AdvanceOne();
         context->_lineNumber++;
 	}
 	
@@ -355,10 +356,10 @@ namespace generic_lexer
         }
         if (context->GetChar() == 'f') {
             // floating point expression
+			context->AdvanceOne();
             token.length++;
         }
         WriteToken(token, context);
-        context->AdvanceOne();
     }
 
 	bool ParseToken(Lexer* context)
@@ -688,7 +689,7 @@ namespace generic_lexer
 	}
 
 	//
-	bool Parse(Lexer* context, char* buffer, uint32_t bufferSize, Token* tokenBuffer, uint32_t tokenBufferSize, Lexer::Flags flags)
+	bool Tokenize(Lexer* context, char* buffer, uint32_t bufferSize, Token* tokenBuffer, uint32_t tokenBufferSize, Lexer::Flags flags)
 	{
 		context->_bufferStart = buffer;
 		context->_bufferSize = bufferSize;
