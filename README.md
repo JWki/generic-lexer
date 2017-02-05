@@ -4,4 +4,6 @@ Widely undocumented and unclean code.
 
 Known flaws:
 
-* Lexer is NOT CORRECT yet, i.e. there are ways to produce 'correct' tokens from incorrect input.
+None. This is a flawless, bug-free piece of software.
+
+Seriously I don't know of any obvious bugs at the time of this writing but I don't guarantee bug-freeness.
