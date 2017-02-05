@@ -42,6 +42,13 @@ using std::uint64_t;
 
 namespace generic_lexer
 {
+
+    struct String
+    {
+        uint64_t    size;   // will be padded to 8 byte anyways so we can use the full range while we're at it
+        char*       buf;   
+    };
+
 	typedef uint16_t TokenType;
 
 	struct DefaultToken
@@ -49,7 +56,7 @@ namespace generic_lexer
         enum Type : uint16_t
         {
             UNDEFINED = 0,
-            GENERIC_TOKEN = 1,  // interpretation of this is up to the user 
+            IDENTIFIER = 1,  // this used to be GENERIC_TOKEN
 
             // different bracket types
             PARENTHESES_OPEN = 2,       // (
@@ -104,12 +111,13 @@ namespace generic_lexer
 
             DOUBLE_COLON = 40,
             EoF = 41,
-            LAST_TYPE = EoF
+
+            LAST_TYPE = EoF + 1
         };
 	};
 
-	static const char* DefaultTokenStrings[DefaultToken::LAST_TYPE + 1] = {
-		"UNDEFINED", "GENERIC_TOKEN", 
+	static const char* DefaultTokenStrings[DefaultToken::LAST_TYPE] = {
+		"UNDEFINED", "IDENTIFIER", 
 		"PARENTHESES_OPEN", "PARENTHESES_CLOSE",
 		"SQUARE_BRACKET_OPEN", "SQUARE_BRACKET_CLOSE",
 		"CURLY_BRACES_OPEN", "CURLY_BRACES_CLOSE",
@@ -130,10 +138,10 @@ namespace generic_lexer
         };
 		char*       text = nullptr;     // pointer into the source buffer
 		uint32_t    length = 0;         // length of the string containing the token
-        uint16_t    userType = 0;       // can be used to add token types in additional passes
-
         uint32_t    lineNumber = 0;
 	};
+
+
 
 	//
 	struct Lexer
@@ -150,6 +158,10 @@ namespace generic_lexer
         uint32_t    _lineNumber = 0;
 
 		uint16_t    _multilineCommentDepth = 0; // we support nested multiline comments. suck it, C.
+
+        TokenType*  _keywordTokenTypes = nullptr;
+        char**      _keywordRegister = nullptr;
+        uint32_t    _numKeywords = 0;
 
 		enum Flags : uint16_t
 		{
@@ -178,6 +190,25 @@ namespace generic_lexer
 		{
 			_currentPos++;
 		}
+
+        int FindKeyword(const char* identifier, uint32_t identifierLength)
+        {
+            for (auto i = 0; i < _numKeywords; ++i) {
+                char* keyword = _keywordRegister[i];
+                if (strlen(keyword) != identifierLength) {
+                    continue;
+                }
+                bool match = true;
+                for (auto j = 0; j < (identifierLength); ++j) {
+                    if (keyword[j] != identifier[j]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) { return i; }
+            }
+            return -1;
+        }
 	};
 
 	// 
@@ -291,10 +322,10 @@ namespace generic_lexer
 		};
 	}
 
-	void ParseGenericToken(Lexer* context)
+	void ParseIdentifier(Lexer* context)
 	{
 		Token token;
-		token.type = DefaultToken::GENERIC_TOKEN;
+		token.type = DefaultToken::IDENTIFIER;
 		token.text = context->_currentPos;
 		token.length = 0;
 
@@ -303,7 +334,11 @@ namespace generic_lexer
 			context->AdvanceOne();
 			token.length++;
 		}
-
+        // Check whether the identifier is a keyword
+        auto index = context->FindKeyword(token.text, token.length);
+        if (index >= 0) {
+            token.type = context->_keywordTokenTypes[index];
+        }
 		// write token to buffer
 		WriteToken(token, context);
 	}
@@ -693,7 +728,7 @@ namespace generic_lexer
                     ParseNumericConstant(context);
                 }
                 else {
-                    ParseGenericToken(context);
+                    ParseIdentifier(context);
                 }
 			} break;
 		}
@@ -701,7 +736,7 @@ namespace generic_lexer
 	}
 
 	//
-	bool Tokenize(Lexer* context, char* buffer, uint32_t bufferSize, Token* tokenBuffer, uint32_t tokenBufferSize, Lexer::Flags flags)
+	bool Tokenize(Lexer* context, char* buffer, uint32_t bufferSize, Token* tokenBuffer, uint32_t tokenBufferSize, Lexer::Flags flags, const char** keywordStrings = nullptr, const TokenType* keywordTypes = nullptr, uint32_t numKeywords = 0)
 	{
 		context->_bufferStart = buffer;
 		context->_bufferSize = bufferSize;
@@ -711,6 +746,10 @@ namespace generic_lexer
 		context->_flags = flags;
 		context->_numTokens = 0;
         context->_lineNumber = 1;   // gross. but correct.
+
+        context->_numKeywords = numKeywords;
+        context->_keywordRegister = (char**)keywordStrings;
+        context->_keywordTokenTypes = (TokenType*)keywordTypes;
 
 		while (!IsEoF(context->GetChar())) {
 			EatWhitespaces(context);
@@ -723,7 +762,6 @@ namespace generic_lexer
         eofToken.text = context->_currentPos;
         eofToken.length = 1;
         eofToken.type = DefaultToken::EoF;
-        eofToken.userType = 0;
         WriteToken(eofToken, context);
 
 		return true;
