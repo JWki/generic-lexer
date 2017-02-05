@@ -123,7 +123,7 @@ namespace generic_lexer
             STRING_LITERAL = 37,
 
             CHARACTER_CONSTANT = 38,
-            NUMERIC_CONSTANT = 39,
+            NUMERIC_LITERAL = 39,
 
             ARROW = 40,
             DOUBLE_COLON = 41,
@@ -242,9 +242,9 @@ namespace generic_lexer
 			SKIP_SINGLE_LINE_COMMENTS = 1 << 2,
 			SKIP_ALL_COMMENTS = SKIP_MULTILINE_COMMENTS | SKIP_SINGLE_LINE_COMMENTS,
             PRODUCE_STRING_LITERALS = 1 << 3,
-            PRODUCE_NUMERIC_CONSTANTS = 1 << 4,
+            PRODUCE_NUMERIC_LITERALS = 1 << 4,
             PRODUCE_CHARACTER_CONSTANTS = 1 << 5,
-            PRODUCE_CONSTANTS = PRODUCE_NUMERIC_CONSTANTS | PRODUCE_CHARACTER_CONSTANTS
+            PRODUCE_CONSTANTS = PRODUCE_NUMERIC_LITERALS | PRODUCE_CHARACTER_CONSTANTS
 		} _flags;
 
 		char GetChar()
@@ -386,7 +386,7 @@ namespace generic_lexer
     static void ParseNumericConstant(Lexer* context)
     {
         Token token;
-        token.type = DefaultToken::NUMERIC_CONSTANT;
+        token.type = DefaultToken::NUMERIC_LITERAL;
         token.text.buffer = context->_currentPos;
         token.text.length = 0;
         do {
@@ -480,7 +480,7 @@ namespace generic_lexer
 			} break;
 			case '.' : 
 			{
-                if (context->_flags & Lexer::Flags::PRODUCE_NUMERIC_CONSTANTS && IsNumeric(context->GetCharWithOffset(1))) {
+                if (context->_flags & Lexer::Flags::PRODUCE_NUMERIC_LITERALS && IsNumeric(context->GetCharWithOffset(1))) {
                     break;
                 }
 				Token token;
@@ -728,7 +728,7 @@ namespace generic_lexer
                 if (IsEoF(c)) {
                     return true;
                 }
-                if (context->_flags & Lexer::Flags::PRODUCE_NUMERIC_CONSTANTS && IsNumeric(c)) {
+                if (context->_flags & Lexer::Flags::PRODUCE_NUMERIC_LITERALS && IsNumeric(c)) {
                     ParseNumericConstant(context);
                 }
                 else {
