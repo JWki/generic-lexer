@@ -393,17 +393,23 @@ namespace generic_lexer
             context->AdvanceOne();
             token.text.length++;
         } while (IsNumeric(context->GetChar()) && !IsEoF(context->GetChar()));
-        if (context->GetChar() == '.') {
-            // floating point expression dot
-            do {
+        if (context->GetChar() == 'u') {
+            context->AdvanceOne();
+            token.text.length++;
+        }
+        else {
+            if (context->GetChar() == '.') {
+                // floating point expression dot
+                do {
+                    context->AdvanceOne();
+                    token.text.length++;
+                } while (IsNumeric(context->GetChar()) && !IsWhitespace(context->GetChar()) && !IsEoF(context->GetChar()));
+            }
+            if (context->GetChar() == 'f') {
+                // floating point expression
                 context->AdvanceOne();
                 token.text.length++;
-            } while (IsNumeric(context->GetChar()) && !IsWhitespace(context->GetChar()) && !IsEoF(context->GetChar()));
-        }
-        if (context->GetChar() == 'f') {
-            // floating point expression
-			context->AdvanceOne();
-            token.text.length++;
+            }
         }
         WriteToken(token, context);
     }
@@ -561,8 +567,13 @@ namespace generic_lexer
 				token.type = DefaultToken::MINUS;
 				token.text.buffer = context->_currentPos;
 				token.text.length = 1;
+                context->AdvanceOne();
+                if (context->GetChar() == '>') {
+                    token.type = DefaultToken::ARROW;
+                    token.text.length = 2;
+                    context->AdvanceOne();
+                }
 				WriteToken(token, context);
-				context->AdvanceOne();
 			} break;
 			case '*' : 
 			{
