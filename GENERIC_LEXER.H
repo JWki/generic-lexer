@@ -42,68 +42,73 @@ using std::uint64_t;
 
 namespace generic_lexer
 {
+	typedef uint16_t TokenType;
 
-	enum class TokenType : uint16_t
-	{
-		UNDEFINED = 0,
-		GENERIC_TOKEN = 1,  // interpretation of this is up to the user 
+	struct DefaultToken
+    {
+        enum Type : uint16_t
+        {
+            UNDEFINED = 0,
+            GENERIC_TOKEN = 1,  // interpretation of this is up to the user 
 
-		// different bracket types
-		PARENTHESES_OPEN = 2,       // (
-		PARENTHESES_CLOSE = 3,      // )
-		SQUARE_BRACKET_OPEN = 4,    // [
-		SQUARE_BRACKET_CLOSE = 5,   // ]
-		CURLY_BRACES_OPEN = 6,      // {
-		CURLY_BRACES_CLOSE = 7,     // }
+            // different bracket types
+            PARENTHESES_OPEN = 2,       // (
+            PARENTHESES_CLOSE = 3,      // )
+            SQUARE_BRACKET_OPEN = 4,    // [
+            SQUARE_BRACKET_CLOSE = 5,   // ]
+            CURLY_BRACES_OPEN = 6,      // {
+            CURLY_BRACES_CLOSE = 7,     // }
 
-		// punctuation
-		DOT = 8,            // . 
-		COMMA = 9,          // ,
-		COLON = 10,          // :
-		SEMICOLON = 11,      // ;
-		EXCLAMATION = 12,    // !
-		QUESTION_MARK = 13,  // ?
+            // punctuation
+            DOT = 8,            // . 
+            COMMA = 9,          // ,
+            COLON = 10,          // :
+            SEMICOLON = 11,      // ;
+            EXCLAMATION = 12,    // !
+            QUESTION_MARK = 13,  // ?
 
-		// operators and similars
-		PLUS = 14,       // +
-		MINUS = 15,      // -
-		STAR = 16,       // *
-		SLASH = 17,      // /
-		BACKSLASH = 18,  // well backslash
-		EQUALS = 19,         // =
-		DOUBLE_EQUALS = 20,  // ==
-		LESS = 21,           // < 
-		LEQUALS = 22,        // <=
-		GREATER = 23,        // >
-		GEQUALS = 24,        // >= 
-		NOT_EQUALS = 25,     // !=
+            // operators and similars
+            PLUS = 14,       // +
+            MINUS = 15,      // -
+            STAR = 16,       // *
+            SLASH = 17,      // /
+            BACKSLASH = 18,  // well backslash
+            EQUALS = 19,         // =
+            DOUBLE_EQUALS = 20,  // ==
+            LESS = 21,           // < 
+            LEQUALS = 22,        // <=
+            GREATER = 23,        // >
+            GEQUALS = 24,        // >= 
+            NOT_EQUALS = 25,     // !=
 
-		AMPERSAND = 26,              // &
-		DOUBLE_AMPERSAND = 27,       // &&
-		PIPE = 28,                   // |
-		DOUBLE_PIPE = 29,            // ||
-		CARET = 30,                  // ^
-		DOUBLE_CARET = 31,           // ^^ 
-		TILDE = 32,                  // ~
+            AMPERSAND = 26,              // &
+            DOUBLE_AMPERSAND = 27,       // &&
+            PIPE = 28,                   // |
+            DOUBLE_PIPE = 29,            // ||
+            CARET = 30,                  // ^
+            DOUBLE_CARET = 31,           // ^^ 
+            TILDE = 32,                  // ~
 
-		// more stuff
-		AT = 33,             // @
-		POUND = 34,          // #
-		HASH = POUND,
+            // more stuff
+            AT = 33,             // @
+            POUND = 34,          // #
+            HASH = POUND,
 
-		// string/character stuff
-		QUOTATION_MARK = 35,     // "
-		APOSTROPHE = 36,        // '
-        STRING_LITERAL = 37,
+            // string/character stuff
+            QUOTATION_MARK = 35,     // "
+            APOSTROPHE = 36,        // '
+            STRING_LITERAL = 37,
 
-        CHARACTER_CONSTANT = 38,
-        NUMERIC_CONSTANT = 39,
+            CHARACTER_CONSTANT = 38,
+            NUMERIC_CONSTANT = 39,
 
-        DOUBLE_COLON = 40,
-        EoF = 41
+            DOUBLE_COLON = 40,
+            EoF = 41,
+            LAST_TYPE = EoF
+        };
 	};
 
-	static const char* TokenStrings[42] = {
+	static const char* DefaultTokenStrings[DefaultToken::LAST_TYPE + 1] = {
 		"UNDEFINED", "GENERIC_TOKEN", 
 		"PARENTHESES_OPEN", "PARENTHESES_CLOSE",
 		"SQUARE_BRACKET_OPEN", "SQUARE_BRACKET_CLOSE",
@@ -118,7 +123,11 @@ namespace generic_lexer
 
 	struct Token
 	{
-		TokenType   type = TokenType::UNDEFINED;
+        union  // TODO: this is gross somehow.
+        {
+            TokenType   type;
+            DefaultToken::Type _defTokenType = DefaultToken::UNDEFINED;
+        };
 		char*       text = nullptr;     // pointer into the source buffer
 		uint32_t    length = 0;         // length of the string containing the token
         uint16_t    userType = 0;       // can be used to add token types in additional passes
@@ -285,7 +294,7 @@ namespace generic_lexer
 	void ParseGenericToken(Lexer* context)
 	{
 		Token token;
-		token.type = TokenType::GENERIC_TOKEN;
+		token.type = DefaultToken::GENERIC_TOKEN;
 		token.text = context->_currentPos;
 		token.length = 0;
 
@@ -302,7 +311,7 @@ namespace generic_lexer
     void ParseStringLiteral(Lexer* context)
     {
         Token token;
-        token.type = TokenType::STRING_LITERAL;
+        token.type = DefaultToken::STRING_LITERAL;
         token.text = context->_currentPos;
         token.length = 1;
         do{
@@ -340,7 +349,7 @@ namespace generic_lexer
     void ParseNumericConstant(Lexer* context)
     {
         Token token;
-        token.type = TokenType::NUMERIC_CONSTANT;
+        token.type = DefaultToken::NUMERIC_CONSTANT;
         token.text = context->_currentPos;
         token.length = 0;
         do {
@@ -381,7 +390,7 @@ namespace generic_lexer
 			case '(' : 
 			{
 				Token token;
-				token.type = TokenType::PARENTHESES_OPEN;
+				token.type = DefaultToken::PARENTHESES_OPEN;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -390,7 +399,7 @@ namespace generic_lexer
 			case ')' : 
 			{
 				Token token;
-				token.type = TokenType::PARENTHESES_CLOSE;
+				token.type = DefaultToken::PARENTHESES_CLOSE;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -399,7 +408,7 @@ namespace generic_lexer
 			case '[' : 
 			{
 				Token token;
-				token.type = TokenType::SQUARE_BRACKET_OPEN;
+				token.type = DefaultToken::SQUARE_BRACKET_OPEN;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -408,7 +417,7 @@ namespace generic_lexer
 			case ']' : 
 			{
 				Token token;
-				token.type = TokenType::SQUARE_BRACKET_CLOSE;
+				token.type = DefaultToken::SQUARE_BRACKET_CLOSE;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -417,7 +426,7 @@ namespace generic_lexer
 			case '{' : 
 			{
 				Token token;
-				token.type = TokenType::CURLY_BRACES_OPEN;
+				token.type = DefaultToken::CURLY_BRACES_OPEN;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -426,7 +435,7 @@ namespace generic_lexer
 			case '}' : 
 			{
 				Token token;
-				token.type = TokenType::CURLY_BRACES_CLOSE;
+				token.type = DefaultToken::CURLY_BRACES_CLOSE;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -438,7 +447,7 @@ namespace generic_lexer
                     break;
                 }
 				Token token;
-				token.type = TokenType::DOT;
+				token.type = DefaultToken::DOT;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -447,7 +456,7 @@ namespace generic_lexer
 			case ',' : 
 			{
 				Token token;
-				token.type = TokenType::COMMA;
+				token.type = DefaultToken::COMMA;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -456,12 +465,12 @@ namespace generic_lexer
 			case ':' : 
 			{
 				Token token;
-				token.type = TokenType::COLON;
+				token.type = DefaultToken::COLON;
 				token.text = context->_currentPos;
 				token.length = 1;
 				context->AdvanceOne();
                 if (context->GetChar() == ':') {
-                    token.type = TokenType::DOUBLE_COLON;
+                    token.type = DefaultToken::DOUBLE_COLON;
                     token.length = 2;
                     context->AdvanceOne();
                 }
@@ -470,7 +479,7 @@ namespace generic_lexer
 			case ';' : 
 			{
 				Token token;
-				token.type = TokenType::SEMICOLON;
+				token.type = DefaultToken::SEMICOLON;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -479,13 +488,13 @@ namespace generic_lexer
 			case '!' : 
 			{
 				Token token;
-				token.type = TokenType::SQUARE_BRACKET_CLOSE;
+				token.type = DefaultToken::SQUARE_BRACKET_CLOSE;
 				token.text = context->_currentPos;
 				token.length = 1;
 
                 context->AdvanceOne();
 				if(context->GetChar() == '=') {
-				    token.type = TokenType::NOT_EQUALS;
+				    token.type = DefaultToken::NOT_EQUALS;
 				    token.length = 2;
                     context->AdvanceOne();
 				} 
@@ -494,7 +503,7 @@ namespace generic_lexer
 			case '?' : 
 			{
 				Token token;
-				token.type = TokenType::QUESTION_MARK;
+				token.type = DefaultToken::QUESTION_MARK;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -503,7 +512,7 @@ namespace generic_lexer
 			case '+' : 
 			{
 				Token token;
-				token.type = TokenType::PLUS;
+				token.type = DefaultToken::PLUS;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -512,7 +521,7 @@ namespace generic_lexer
 			case '-' : 
 			{
 				Token token;
-				token.type = TokenType::MINUS;
+				token.type = DefaultToken::MINUS;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -521,7 +530,7 @@ namespace generic_lexer
 			case '*' : 
 			{
 				Token token;
-				token.type = TokenType::STAR;
+				token.type = DefaultToken::STAR;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -530,7 +539,7 @@ namespace generic_lexer
 			case '/' : 
 			{
 				Token token;
-				token.type = TokenType::SLASH;
+				token.type = DefaultToken::SLASH;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -539,7 +548,7 @@ namespace generic_lexer
 			case '\\' : 
 			{
 				Token token;
-				token.type = TokenType::BACKSLASH;
+				token.type = DefaultToken::BACKSLASH;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -548,7 +557,7 @@ namespace generic_lexer
 			case '=' : 
 			{
 				Token token;
-				token.type = TokenType::EQUALS;
+				token.type = DefaultToken::EQUALS;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -557,12 +566,12 @@ namespace generic_lexer
 			case '<' : 
 			{
 				Token token;
-				token.type = TokenType::LESS;
+				token.type = DefaultToken::LESS;
 				token.text = context->_currentPos;
 				token.length = 1;
 				context->AdvanceOne();
 				if(context->GetChar() == '=') {
-					token.type = TokenType::LEQUALS;
+					token.type = DefaultToken::LEQUALS;
 					token.length = 2;
 					context->AdvanceOne();
 				}
@@ -571,12 +580,12 @@ namespace generic_lexer
 			case '>' : 
 			{
 				Token token;
-				token.type = TokenType::GREATER;
+				token.type = DefaultToken::GREATER;
 				token.text = context->_currentPos;
 				token.length = 1;
 				context->AdvanceOne();
 				if(context->GetChar() == '=') {
-					token.type = TokenType::GEQUALS;
+					token.type = DefaultToken::GEQUALS;
 					token.length = 2;
 					context->AdvanceOne();
 				}
@@ -585,7 +594,7 @@ namespace generic_lexer
 			case '&' : 
 			{
 				Token token;
-				token.type = TokenType::AMPERSAND;
+				token.type = DefaultToken::AMPERSAND;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -594,7 +603,7 @@ namespace generic_lexer
 			case '|' : 
 			{
 				Token token;
-				token.type = TokenType::PIPE;
+				token.type = DefaultToken::PIPE;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -603,7 +612,7 @@ namespace generic_lexer
 			case '^' : 
 			{
 				Token token;
-				token.type = TokenType::CARET;
+				token.type = DefaultToken::CARET;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -612,7 +621,7 @@ namespace generic_lexer
 			case '~' : 
 			{
 				Token token;
-				token.type = TokenType::TILDE;
+				token.type = DefaultToken::TILDE;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -621,7 +630,7 @@ namespace generic_lexer
 			case '@' : 
 			{
 				Token token;
-				token.type = TokenType::AT;
+				token.type = DefaultToken::AT;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -630,7 +639,7 @@ namespace generic_lexer
 			case '#' : 
 			{
 				Token token;
-				token.type = TokenType::POUND;
+				token.type = DefaultToken::POUND;
 				token.text = context->_currentPos;
 				token.length = 1;
 				WriteToken(token, context);
@@ -643,7 +652,7 @@ namespace generic_lexer
                 }
                 else {
                     Token token;
-                    token.type = TokenType::QUOTATION_MARK;
+                    token.type = DefaultToken::QUOTATION_MARK;
                     token.text = context->_currentPos;
                     token.length = 1;
                     WriteToken(token, context);
@@ -654,7 +663,7 @@ namespace generic_lexer
 			{
                 if (context->_flags & Lexer::Flags::PRODUCE_CHARACTER_CONSTANTS) {
                     Token token;
-                    token.type = TokenType::CHARACTER_CONSTANT;
+                    token.type = DefaultToken::CHARACTER_CONSTANT;
                     token.text = context->_currentPos;
                     token.length = 3;
                     WriteToken(token, context);
@@ -668,7 +677,7 @@ namespace generic_lexer
                 }
                 else {
                     Token token;
-                    token.type = TokenType::APOSTROPHE;
+                    token.type = DefaultToken::APOSTROPHE;
                     token.text = context->_currentPos;
                     token.length = 1;
                     WriteToken(token, context);
@@ -677,6 +686,9 @@ namespace generic_lexer
 			} break;
 			default:
 			{
+                if (IsEoF(c)) {
+                    return true;
+                }
                 if (context->_flags & Lexer::Flags::PRODUCE_NUMERIC_CONSTANTS && IsNumeric(c)) {
                     ParseNumericConstant(context);
                 }
@@ -710,7 +722,7 @@ namespace generic_lexer
         Token eofToken;
         eofToken.text = context->_currentPos;
         eofToken.length = 1;
-        eofToken.type = TokenType::EoF;
+        eofToken.type = DefaultToken::EoF;
         eofToken.userType = 0;
         WriteToken(eofToken, context);
 
