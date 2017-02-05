@@ -24,7 +24,7 @@
 
 
 //
-//  TODO: Make lexer CORRECT
+// 
 //
 //
 
@@ -42,17 +42,22 @@ using std::uint64_t;
 
 namespace generic_lexer
 {
-
+    /** simple string type with explicit size field used to refer to non-nullterminated strings */
     struct String
     {
-        uint64_t    size;   // will be padded to 8 byte anyways so we can use the full range while we're at it
-        char*       buf;   
+        uint64_t    length  = 0;        // will be padded to 8 byte anyways (on 64 bit platforms) so we can use the full range while we're at it
+        char*       buffer  = nullptr;   
+
+        String() = default;
+        String(uint64_t len, char* buf) : length(len), buffer(buf) {}
     };
 
+    /**  */
 	typedef uint16_t TokenType;
 
 	struct DefaultToken
     {
+        /** Default token types */
         enum Type : uint16_t
         {
             UNDEFINED = 0,
@@ -109,13 +114,15 @@ namespace generic_lexer
             CHARACTER_CONSTANT = 38,
             NUMERIC_CONSTANT = 39,
 
-            DOUBLE_COLON = 40,
-            EoF = 41,
+            ARROW = 40,
+            DOUBLE_COLON = 41,
+            EoF = 42,
 
             LAST_TYPE = EoF + 1
         };
 	};
 
+    /** Printable strings for each default token type */
 	static const char* DefaultTokenStrings[DefaultToken::LAST_TYPE] = {
 		"UNDEFINED", "IDENTIFIER", 
 		"PARENTHESES_OPEN", "PARENTHESES_CLOSE",
@@ -125,10 +132,11 @@ namespace generic_lexer
 		"PLUS", "MINUS", "STAR", "SLASH", "BACKSLASH", "EQUALS", "DOUBLE_EQUALS",
 		"LESS", "LEQUALS", "GREATER", "GEQUALS", "NOT_EQUALS", "AMPERSAND",
 		"DOUBLE_AMPERSAND", "PIPE", "DOUBLE_PIPE", "CARET", "DOUBLE_CARET", "TILDE",
-		"AT", "POUND", "QUOTATION_MARK", "APOSTROPHE", "STRING_LITERAL", "CHARACTER_CONSTANT", "NUMERIC_CONSTANT",
+		"AT", "POUND", "QUOTATION_MARK", "APOSTROPHE", "STRING_LITERAL", "CHARACTER_CONSTANT", "NUMERIC_CONSTANT", "ARROW",
         "DOUBLE_COLON", "EoF"
 	}; 
 
+    /** Data type for tokens. */
 	struct Token
 	{
         union  // TODO: this is gross somehow.
@@ -136,14 +144,67 @@ namespace generic_lexer
             TokenType   type;
             DefaultToken::Type _defTokenType = DefaultToken::UNDEFINED;
         };
-		char*       text = nullptr;     // pointer into the source buffer
-		uint32_t    length = 0;         // length of the string containing the token
+        String      text;
         uint32_t    lineNumber = 0;
 	};
 
+    // 
+    bool IsEoF(char c)
+    {
+        return c == '\0';
+    }
+    bool IsEndl(char c)
+    {
+        return c == '\n';
+    }
+    bool IsWhitespace(char c)
+    {
+        return c == ' ' || c == '\r' || c == '\t' || IsEndl(c) || IsEoF(c);
+    }
+    bool IsNumeric(char c)
+    {
+        return (c == '0' || c == '1'
+            || c == '2' || c == '3'
+            || c == '4' || c == '5'
+            || c == '6' || c == '7'
+            || c == '8' || c == '9');
+    }
+    bool IsAlphabetic(char c)
+    {
+        return
+            (c == 'a' || c == 'A' ||
+                c == 'b' || c == 'B' ||
+                c == 'c' || c == 'C' ||
+                c == 'd' || c == 'D' ||
+                c == 'e' || c == 'E' ||
+                c == 'f' || c == 'F' ||
+                c == 'g' || c == 'G' ||
+                c == 'h' || c == 'H' ||
+                c == 'i' || c == 'I' ||
+                c == 'j' || c == 'J' ||
+                c == 'k' || c == 'K' ||
+                c == 'l' || c == 'L' ||
+                c == 'm' || c == 'M' ||
+                c == 'n' || c == 'N' ||
+                c == 'o' || c == 'O' ||
+                c == 'p' || c == 'P' ||
+                c == 'q' || c == 'Q' ||
+                c == 'r' || c == 'R' ||
+                c == 's' || c == 'S' ||
+                c == 't' || c == 'T' ||
+                c == 'u' || c == 'U' ||
+                c == 'v' || c == 'V' ||
+                c == 'w' || c == 'W' ||
+                c == 'x' || c == 'X' ||
+                c == 'y' || c == 'Y' ||
+                c == 'z' || c == 'Z');
+    }
+    bool IsAlphaNumeric(char c)
+    {
+        return IsNumeric(c) || IsAlphabetic(c);
+    }
 
-
-	//
+	/** Main data structure for lexing state. */
 	struct Lexer
 	{
 		char*       _bufferStart = nullptr;  // pointer to the buffer to parse 
@@ -188,6 +249,9 @@ namespace generic_lexer
 
 		void AdvanceOne()
 		{
+            if (IsEndl(*_currentPos)) {
+                _lineNumber++;
+            }
 			_currentPos++;
 		}
 
@@ -211,33 +275,16 @@ namespace generic_lexer
         }
 	};
 
-	// 
-	bool IsEoF(char c)
-	{
-		return c == '\0';
-	}
-
-
-	bool IsEndl(char c)
-	{
-		return c == '\n';
-	}
-
-	bool IsWhitespace(char c)
-	{
-		return c == ' ' || c == '\r' || c == '\t' || IsEndl(c) || IsEoF(c);
-	}
-
+	
+    /** Has the lexer eat all the whitespaces and endlines */
 	void EatWhitespaces(Lexer* context)
 	{
 		while (!IsEoF(context->GetChar()) && IsWhitespace(context->GetChar())) {
-            if (IsEndl(context->GetChar())) {
-                context->_lineNumber++;
-            }
 			context->AdvanceOne();
 		}
 	}
 
+    /** Skips a multiline comment including nested multiline comments */
 	void SkipMultilineComment(Lexer* context)
 	{
 		do {
@@ -256,22 +303,20 @@ namespace generic_lexer
 				context->AdvanceOne();
 				continue;
 			}
-            if (IsEndl(c)) {
-                context->_lineNumber++;
-            }
 			context->AdvanceOne();
 		} while (context->_multilineCommentDepth > 0);
 	}
 
+    /** Skips to the next line */
 	void SkipLine(Lexer* context)
 	{
 		while(!IsEndl(context->GetChar())) {
 			context->AdvanceOne(); 
 		}
 		context->AdvanceOne();
-        context->_lineNumber++;
 	}
 	
+    /** Writes a token to the buffer */
 	void WriteToken(Token token, Lexer* context)
 	{
 		auto newTokenOffset = context->_tokenStreamBufferOffset + 1;
@@ -282,60 +327,23 @@ namespace generic_lexer
 		context->_numTokens++;
 	}
 
-	bool IsNonGeneric(char c)
-	{
-		switch(c)
-		{
-			case '(':
-			case ')':
-			case '[':
-			case ']':
-			case '{':
-			case '}':
-			case '.':
-			case ',':
-			case ':':
-			case ';':
-			case '!':
-			case '?':
-			case '+':
-			case '-':
-			case '*':
-			case '/':
-			case '\\':
-			case '=':
-			case '<':
-			case '>':
-			case '&':
-			case '|':
-			case '^':
-			case '~':
-			case '@':
-			case '#':
-			case '\'':
-			case '"':
-				return true;
-			break;
-			default:
-				return false;
-			break;
-		};
-	}
+    
 
 	void ParseIdentifier(Lexer* context)
 	{
 		Token token;
 		token.type = DefaultToken::IDENTIFIER;
-		token.text = context->_currentPos;
-		token.length = 0;
+		token.text.buffer = context->_currentPos;
+		token.text.length = 0;
 
-		while (!IsNonGeneric(context->GetChar()) && !IsWhitespace(context->GetChar()))
+        /** We only go in here when the first character is not numeric so this check is fine for the first character. */
+		while (IsAlphaNumeric(context->GetChar()))
 		{
 			context->AdvanceOne();
-			token.length++;
+			token.text.length++;
 		}
         // Check whether the identifier is a keyword
-        auto index = context->FindKeyword(token.text, token.length);
+        auto index = context->FindKeyword(token.text.buffer, token.text.length);
         if (index >= 0) {
             token.type = context->_keywordTokenTypes[index];
         }
@@ -347,61 +355,41 @@ namespace generic_lexer
     {
         Token token;
         token.type = DefaultToken::STRING_LITERAL;
-        token.text = context->_currentPos;
-        token.length = 1;
+        token.text.buffer = context->_currentPos;
+        token.text.length = 1;
         do{
             context->AdvanceOne();
-            token.length++;
+            token.text.length++;
         } while (context->GetChar() != '"' && !IsEoF(context->GetChar()));
-       
+        assert(!IsEoF(context->GetChar()));     // we want a closing quotation mark
         WriteToken(token, context);
         context->AdvanceOne();
     }
 
-    bool IsNumeric(char c)
-    {
-        switch (c) {
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-                return true;
-                break;
-            default:
-            {
-                return false;
-            } break;
-        }
-    }
+   
 
     // TODO: Maybe move this out and let higher levels (lexer extensions) handle this
     void ParseNumericConstant(Lexer* context)
     {
         Token token;
         token.type = DefaultToken::NUMERIC_CONSTANT;
-        token.text = context->_currentPos;
-        token.length = 0;
+        token.text.buffer = context->_currentPos;
+        token.text.length = 0;
         do {
             context->AdvanceOne();
-            token.length++;
+            token.text.length++;
         } while (IsNumeric(context->GetChar()) && !IsEoF(context->GetChar()));
         if (context->GetChar() == '.') {
             // floating point expression dot
             do {
                 context->AdvanceOne();
-                token.length++;
+                token.text.length++;
             } while (IsNumeric(context->GetChar()) && !IsWhitespace(context->GetChar()) && !IsEoF(context->GetChar()));
         }
         if (context->GetChar() == 'f') {
             // floating point expression
 			context->AdvanceOne();
-            token.length++;
+            token.text.length++;
         }
         WriteToken(token, context);
     }
@@ -426,8 +414,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::PARENTHESES_OPEN;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -435,8 +423,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::PARENTHESES_CLOSE;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -444,8 +432,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::SQUARE_BRACKET_OPEN;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -453,8 +441,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::SQUARE_BRACKET_CLOSE;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -462,8 +450,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::CURLY_BRACES_OPEN;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -471,8 +459,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::CURLY_BRACES_CLOSE;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -483,8 +471,8 @@ namespace generic_lexer
                 }
 				Token token;
 				token.type = DefaultToken::DOT;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -492,8 +480,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::COMMA;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -501,12 +489,12 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::COLON;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				context->AdvanceOne();
                 if (context->GetChar() == ':') {
                     token.type = DefaultToken::DOUBLE_COLON;
-                    token.length = 2;
+                    token.text.length = 2;
                     context->AdvanceOne();
                 }
                 WriteToken(token, context);
@@ -515,8 +503,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::SEMICOLON;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -524,13 +512,13 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::SQUARE_BRACKET_CLOSE;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 
                 context->AdvanceOne();
 				if(context->GetChar() == '=') {
 				    token.type = DefaultToken::NOT_EQUALS;
-				    token.length = 2;
+				    token.text.length = 2;
                     context->AdvanceOne();
 				} 
                 WriteToken(token, context);
@@ -539,8 +527,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::QUESTION_MARK;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -548,8 +536,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::PLUS;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -557,8 +545,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::MINUS;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -566,8 +554,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::STAR;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -575,8 +563,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::SLASH;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -584,8 +572,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::BACKSLASH;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -593,8 +581,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::EQUALS;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -602,12 +590,12 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::LESS;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				context->AdvanceOne();
 				if(context->GetChar() == '=') {
 					token.type = DefaultToken::LEQUALS;
-					token.length = 2;
+					token.text.length = 2;
 					context->AdvanceOne();
 				}
 				WriteToken(token, context);
@@ -616,12 +604,12 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::GREATER;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				context->AdvanceOne();
 				if(context->GetChar() == '=') {
 					token.type = DefaultToken::GEQUALS;
-					token.length = 2;
+					token.text.length = 2;
 					context->AdvanceOne();
 				}
 				WriteToken(token, context);
@@ -630,8 +618,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::AMPERSAND;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -639,8 +627,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::PIPE;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -648,8 +636,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::CARET;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -657,8 +645,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::TILDE;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -666,8 +654,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::AT;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -675,8 +663,8 @@ namespace generic_lexer
 			{
 				Token token;
 				token.type = DefaultToken::POUND;
-				token.text = context->_currentPos;
-				token.length = 1;
+				token.text.buffer = context->_currentPos;
+				token.text.length = 1;
 				WriteToken(token, context);
 				context->AdvanceOne();
 			} break;
@@ -688,8 +676,8 @@ namespace generic_lexer
                 else {
                     Token token;
                     token.type = DefaultToken::QUOTATION_MARK;
-                    token.text = context->_currentPos;
-                    token.length = 1;
+                    token.text.buffer = context->_currentPos;
+                    token.text.length = 1;
                     WriteToken(token, context);
                     context->AdvanceOne();
                 }
@@ -699,8 +687,8 @@ namespace generic_lexer
                 if (context->_flags & Lexer::Flags::PRODUCE_CHARACTER_CONSTANTS) {
                     Token token;
                     token.type = DefaultToken::CHARACTER_CONSTANT;
-                    token.text = context->_currentPos;
-                    token.length = 3;
+                    token.text.buffer = context->_currentPos;
+                    token.text.length = 3;
                     WriteToken(token, context);
                     context->AdvanceOne();
                     context->AdvanceOne();  
@@ -713,8 +701,8 @@ namespace generic_lexer
                 else {
                     Token token;
                     token.type = DefaultToken::APOSTROPHE;
-                    token.text = context->_currentPos;
-                    token.length = 1;
+                    token.text.buffer = context->_currentPos;
+                    token.text.length = 1;
                     WriteToken(token, context);
                     context->AdvanceOne();
                 }
@@ -759,8 +747,8 @@ namespace generic_lexer
             }
 		}
         Token eofToken;
-        eofToken.text = context->_currentPos;
-        eofToken.length = 1;
+        eofToken.text.buffer = context->_currentPos;
+        eofToken.text.length = 1;
         eofToken.type = DefaultToken::EoF;
         WriteToken(eofToken, context);
 
