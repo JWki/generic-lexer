@@ -19,7 +19,6 @@
 //  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 //  SOFTWARE.
-
 #pragma once
 
 
@@ -27,7 +26,6 @@
 // 
 //
 //
-
 #include <cassert>
 #include <cstdint>
 using std::int8_t;
@@ -51,6 +49,19 @@ namespace generic_lexer
         String() = default;
         String(uint64_t len, char* buf) : length(len), buffer(buf) {}
     };
+
+    /** simple strlen implementation to not depend on standard libraries for a single call */
+    static size_t strlen(const char* str)
+    {
+        size_t len = 0;
+        while (*str != '\0') {
+            ++str;
+            ++len;
+        }
+        return len;
+    }
+
+    /***/
 
     /**  */
 	typedef uint16_t TokenType;
@@ -149,19 +160,19 @@ namespace generic_lexer
 	};
 
     // 
-    bool IsEoF(char c)
+    static bool IsEoF(char c)
     {
         return c == '\0';
     }
-    bool IsEndl(char c)
+    static bool IsEndl(char c)
     {
         return c == '\n';
     }
-    bool IsWhitespace(char c)
+    static bool IsWhitespace(char c)
     {
         return c == ' ' || c == '\r' || c == '\t' || IsEndl(c) || IsEoF(c);
     }
-    bool IsNumeric(char c)
+    static bool IsNumeric(char c)
     {
         return (c == '0' || c == '1'
             || c == '2' || c == '3'
@@ -169,7 +180,7 @@ namespace generic_lexer
             || c == '6' || c == '7'
             || c == '8' || c == '9');
     }
-    bool IsAlphabetic(char c)
+    static bool IsAlphabetic(char c)
     {
         return
             (c == 'a' || c == 'A' ||
@@ -199,7 +210,7 @@ namespace generic_lexer
                 c == 'y' || c == 'Y' ||
                 c == 'z' || c == 'Z');
     }
-    bool IsAlphaNumeric(char c)
+    static bool IsAlphaNumeric(char c)
     {
         return IsNumeric(c) || IsAlphabetic(c);
     }
@@ -257,13 +268,13 @@ namespace generic_lexer
 
         int FindKeyword(const char* identifier, uint32_t identifierLength)
         {
-            for (auto i = 0; i < _numKeywords; ++i) {
+            for (auto i = 0u; i < _numKeywords; ++i) {
                 char* keyword = _keywordRegister[i];
                 if (strlen(keyword) != identifierLength) {
                     continue;
                 }
                 bool match = true;
-                for (auto j = 0; j < (identifierLength); ++j) {
+                for (auto j = 0u; j < (identifierLength); ++j) {
                     if (keyword[j] != identifier[j]) {
                         match = false;
                         break;
@@ -277,7 +288,7 @@ namespace generic_lexer
 
 	
     /** Has the lexer eat all the whitespaces and endlines */
-	void EatWhitespaces(Lexer* context)
+    static void EatWhitespaces(Lexer* context)
 	{
 		while (!IsEoF(context->GetChar()) && IsWhitespace(context->GetChar())) {
 			context->AdvanceOne();
@@ -285,7 +296,7 @@ namespace generic_lexer
 	}
 
     /** Skips a multiline comment including nested multiline comments */
-	void SkipMultilineComment(Lexer* context)
+    static void SkipMultilineComment(Lexer* context)
 	{
 		do {
 			char c = context->GetChar();
@@ -308,7 +319,7 @@ namespace generic_lexer
 	}
 
     /** Skips to the next line */
-	void SkipLine(Lexer* context)
+    static void SkipLine(Lexer* context)
 	{
 		while(!IsEndl(context->GetChar())) {
 			context->AdvanceOne(); 
@@ -317,19 +328,19 @@ namespace generic_lexer
 	}
 	
     /** Writes a token to the buffer */
-	void WriteToken(Token token, Lexer* context)
+    static void WriteToken(Token token, Lexer* context)
 	{
 		auto newTokenOffset = context->_tokenStreamBufferOffset + 1;
 		assert(sizeof(Token) * newTokenOffset <= context->_tokenStreamBufferSize);
         token.lineNumber = context->_lineNumber;
-		memcpy(&context->_tokenStreamBuffer[context->_tokenStreamBufferOffset], &token, sizeof(Token));
+		context->_tokenStreamBuffer[context->_tokenStreamBufferOffset] = token;
 		context->_tokenStreamBufferOffset = newTokenOffset;
 		context->_numTokens++;
 	}
 
     
 
-	void ParseIdentifier(Lexer* context)
+    static void ParseIdentifier(Lexer* context)
 	{
 		Token token;
 		token.type = DefaultToken::IDENTIFIER;
@@ -343,7 +354,7 @@ namespace generic_lexer
 			token.text.length++;
 		}
         // Check whether the identifier is a keyword
-        auto index = context->FindKeyword(token.text.buffer, token.text.length);
+        auto index = context->FindKeyword(token.text.buffer, (uint32_t)token.text.length);
         if (index >= 0) {
             token.type = context->_keywordTokenTypes[index];
         }
@@ -351,7 +362,7 @@ namespace generic_lexer
 		WriteToken(token, context);
 	}
 
-    void ParseStringLiteral(Lexer* context)
+    static bool ParseStringLiteral(Lexer* context)
     {
         Token token;
         token.type = DefaultToken::STRING_LITERAL;
@@ -362,6 +373,9 @@ namespace generic_lexer
             token.text.length++;
         } while (context->GetChar() != '"' && !IsEoF(context->GetChar()));
         assert(!IsEoF(context->GetChar()));     // we want a closing quotation mark
+        if (IsEoF(context->GetChar())) {
+            return false;
+        }
         WriteToken(token, context);
         context->AdvanceOne();
     }
@@ -369,7 +383,7 @@ namespace generic_lexer
    
 
     // TODO: Maybe move this out and let higher levels (lexer extensions) handle this
-    void ParseNumericConstant(Lexer* context)
+    static void ParseNumericConstant(Lexer* context)
     {
         Token token;
         token.type = DefaultToken::NUMERIC_CONSTANT;
@@ -394,7 +408,7 @@ namespace generic_lexer
         WriteToken(token, context);
     }
 
-	bool ParseToken(Lexer* context)
+    static bool ParseToken(Lexer* context)
 	{
 		char c = context->GetChar();
 		if (c == '/' && (context->_flags & Lexer::Flags::SKIP_SINGLE_LINE_COMMENTS || context->_flags & Lexer::Flags::SKIP_MULTILINE_COMMENTS)) {
@@ -671,7 +685,9 @@ namespace generic_lexer
 			case '"' : 
 			{
                 if (context->_flags & Lexer::Flags::PRODUCE_STRING_LITERALS) {
-                    ParseStringLiteral(context);
+                    if (!ParseStringLiteral(context)) {
+                        return false;
+                    }
                 }
                 else {
                     Token token;
@@ -692,8 +708,8 @@ namespace generic_lexer
                     WriteToken(token, context);
                     context->AdvanceOne();
                     context->AdvanceOne();  
+                    assert(context->GetChar() == '\'');
                     if (context->GetChar() != '\'') {
-                        printf("lexer error: ' expected\n");
                         return false;
                     }
                     context->AdvanceOne();
@@ -724,7 +740,7 @@ namespace generic_lexer
 	}
 
 	//
-	bool Tokenize(Lexer* context, char* buffer, uint32_t bufferSize, Token* tokenBuffer, uint32_t tokenBufferSize, Lexer::Flags flags, const char** keywordStrings = nullptr, const TokenType* keywordTypes = nullptr, uint32_t numKeywords = 0)
+    static bool Tokenize(Lexer* context, char* buffer, uint32_t bufferSize, Token* tokenBuffer, uint32_t tokenBufferSize, Lexer::Flags flags, const char** keywordStrings = nullptr, const TokenType* keywordTypes = nullptr, uint32_t numKeywords = 0)
 	{
 		context->_bufferStart = buffer;
 		context->_bufferSize = bufferSize;
@@ -742,7 +758,6 @@ namespace generic_lexer
 		while (!IsEoF(context->GetChar())) {
 			EatWhitespaces(context);
 			if(!ParseToken(context)) {
-                printf("lexer error\n");
                 return false;
             }
 		}
